@@ -30,7 +30,7 @@ def padded_cross_entropy_loss(tgt, model_out, pad_mask,out_mask):
 
 
 def train_step(model, sample, optimizer,
-               variational = False, use_out_mask = True,
+               variational = False, use_out_mask = False,
                prop_pred_loss = False, recon_alpha = 1.0):
     
     optimizer.zero_grad()
