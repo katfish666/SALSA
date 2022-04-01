@@ -2,26 +2,6 @@ from rdkit import Chem
 from rdkit.Chem.rdchem import RWMol
 
 from rdkit.Chem.rdchem import RWMol, Atom, BondType
-def add_atom_to_mol(molgraph, atom_type, to_aidx): 
-    """
-    :param molgraph: RWMol object
-    :param atom_type: str 
-    :param to_aidx: int, which index of molecule to add new atom
-    :return: new graph after atom addition
-    """
-    molgraph_new = copy_rwmol(molgraph)
-    
-    # add atom to mol object
-    atom = Atom(atom_type)
-    atom.SetBoolProp("mutability", True)    
-    molgraph_new.AddAtom(atom)
-    
-    # create bond from new atom to source molecule
-    molgraph_new.AddBond(molgraph_new.GetNumAtoms() - 1, to_aidx, BondType.SINGLE)
-    
-    update_mol_rep(molgraph_new)
-    return molgraph_new
-
 
 def show_atom_index( mol ):
     atoms = mol.GetNumAtoms()
