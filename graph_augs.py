@@ -62,7 +62,7 @@ def add_atom_everywhere(mol, atom_type='random', max_children='max'):
 
         try:
             if atom_type=='random':
-                random.shuffle(subs,seed=i)
+                random.shuffle(subs)
                 atom_type = subs[0]
                 
                 mol_new = add_atom_to_mol(mol, atom_type, i)
