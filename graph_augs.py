@@ -1,17 +1,15 @@
 from rdkit_utils import *
 
 # TODO: change input and return types to Mol instead of RWMol (?)
-def add_atom_to_mol(mol, atom_type, to_aidx, clean_it=True): 
+def add_atom_to_mol(mol, atom_type, to_aidx, clean_aroms=False, clean_it=True): 
     """
     :param mol: Mol object
     :param atom_type: str 
     :param to_aidx: int, which index of molecule to add new atom
     :return: new RWMol object after atom addition
     """
-    molgraph = get_rwmol(mol)
-#     molgraph.UpdatePropertyCache()
-    update_mol_rep(molgraph)
-#     molgraph_new = copy_rwmol(molgraph)
+    molgraph = get_rwmol(mol) # molgraph.UpdatePropertyCache()
+    update_mol_rep(molgraph, clean_aroms)
     
     atom = Atom(atom_type)
     atom.SetBoolProp("mutability", True)    
@@ -19,13 +17,12 @@ def add_atom_to_mol(mol, atom_type, to_aidx, clean_it=True):
     
     molgraph.AddBond(molgraph.GetNumAtoms() - 1, to_aidx, BondType.SINGLE)
     
-    update_mol_rep(molgraph)
-#     molgraph.UpdatePropertyCache()
+    update_mol_rep(molgraph, clean_aroms) 
     mol_new = molgraph.GetMol() 
+    
     if clean_it:
-        mol_new = Chem.MolFromSmiles( canonicalize_smiles( Chem.MolToSmiles(mol_new) ))
+        mol_new = Chem.MolFromSmiles( get_cansmiles( Chem.MolToSmiles(mol_new) ))
     return mol_new
-
 
 import numpy as np
 import random
@@ -47,7 +44,7 @@ def randomly_add_atom(mol, atom_type='O', at_random=True):
     return i,mol_new
 
 
-def add_atom_everywhere(mol, atom_type='random', max_children='max'):
+def add_atom_everywhere(mol, atom_type='weighted', max_children='max', weights=None):
 #     subs = ['Br','I','C','N','S','P','O','F','Cl']
     subs = ['C','O','N','Cl','S','P']
     
@@ -61,7 +58,7 @@ def add_atom_everywhere(mol, atom_type='random', max_children='max'):
     for i in range(0,num_aidc):
 
         try:
-            if atom_type=='random':
+            if atom_type=='weighted':
                 random.shuffle(subs)
                 atom_type = subs[0]
                 

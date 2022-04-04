@@ -3,7 +3,7 @@ from rdkit.Chem.rdchem import RWMol
 
 from rdkit.Chem.rdchem import RWMol, Atom, BondType
 
-def canonicalize_smiles(smiles):
+def get_cansmiles(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return ''
@@ -63,26 +63,29 @@ def copy_rwmol(mol):
     return new_mol 
 
 from rdkit.Chem.rdmolops import SanitizeMol
-def update_mol_rep(molgraph, sanitize=False):
+
+def update_mol_rep(molgraph, clean_aroms=False, sanitize=False):
+    
     if sanitize:
         SanitizeMol(molgraph)
         molgraph.ClearComputedProps()
     
-#     Chem.Kekulize(molgraph)
-    # Setting all atoms to non aromatics
-#     for i in range(molgraph.GetNumAtoms()):
-#         molgraph.GetAtomWithIdx(i).SetIsAromatic(False)
-    # Setting all bonds to non aromatics
-#     for i in range(molgraph.GetNumAtoms()):
-#         for j in range(molgraph.GetNumAtoms()):
-#             bond = molgraph.GetBondBetweenAtoms(i, j)
-#             if bond is not None:
-#                 bond.SetIsAromatic(False)
+    if clean_aroms:
+        Chem.Kekulize(molgraph)
+        # Setting all atoms to non aromatics
+        for i in range(molgraph.GetNumAtoms()):
+            molgraph.GetAtomWithIdx(i).SetIsAromatic(False)
+        # Setting all bonds to non aromatics
+        for i in range(molgraph.GetNumAtoms()):
+            for j in range(molgraph.GetNumAtoms()):
+                bond = molgraph.GetBondBetweenAtoms(i, j)
+                if bond is not None:
+                    bond.SetIsAromatic(False)
 
     for i in range(molgraph.GetNumAtoms()):
         molgraph.GetAtomWithIdx(i).UpdatePropertyCache()
 
     # Updating RDKit representation
     molgraph.UpdatePropertyCache()
-#     Chem.FastFindRings(molgraph)
+    Chem.FastFindRings(molgraph)
     
