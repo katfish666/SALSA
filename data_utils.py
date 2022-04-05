@@ -64,4 +64,4 @@ def tokenize(smileses):
     tokens = ''.join(tokens)
     token_to_idx = dict((token, i) for i, token in enumerate(tokens))
     
-    return token_to_idx
+    return tokens, token_to_idx
