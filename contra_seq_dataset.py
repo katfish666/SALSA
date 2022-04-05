@@ -34,6 +34,7 @@ class ContraSeqDataset(Dataset):
         self.aug_smi = np.asarray(pd.read_csv(aug_path))
         
         augs_arr = np.asarray([x[1] for x in self.aug_smi])
+        
         tokens,_ = tokenize( np.hstack((self.anc_smi,augs_arr)) )  
         all_tokens = list(set(tokens + start_token + end_token + pad_token))
         self.tokens = ''.join(list(np.sort(all_tokens)))        
@@ -59,15 +60,22 @@ class ContraSeqDataset(Dataset):
         vec = self.idc_tensor(smi)
         return vec
  
-
     def remove_extra_tokens(self, smi):
         smi = smi.replace(self.pad,'')
         smi = smi.replace(self.start_token,'')
         return smi.replace(self.end_token,'')
     
+    def undo_BrCl_singles(self,smi):
+        smi = smi.replace('R','Br')
+        return smi.replace('L','Cl')
+    def do_BrCl_singles(self,smi):
+        smi = smi.replace('Br','R')
+        return smi.replace('Cl','L')      
+        
     def convert_vec_to_smi(self, vec, snip=False):
         smi_arr = np.array(list(self.tokens))[vec.cpu().detach().numpy()]
         smi_list = [''.join(arr) for arr in smi_arr]
+        smi_list = [self.undo_BrCl_singles(smi) for smi in smi_list]
         if snip:
             smi_list = [self.remove_extra_tokens(smi) for smi in smi_list]
         return smi_list
@@ -79,8 +87,10 @@ class ContraSeqDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
             
-        anc_vec = self.get_vec(self.anc_smi[idx])        
+        anc_smiles = self.do_BrCl_singles(self.anc_smi[idx])
+        anc_vec = self.get_vec(anc_smiles)        
         aug_smileses = self.aug_smi[self.aug_smi[:,0]==idx][:,1]
+        aug_smileses = [self.do_BrCl_singles(sm) for sm in aug_smileses]
         aug_vecs = torch.stack([self.get_vec(sm) for sm in aug_smileses])
         
         sample = {'anchor': anc_vec,
