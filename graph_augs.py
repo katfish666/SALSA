@@ -74,7 +74,3 @@ def add_atom_everywhere(mol, atom_type='weighted', max_children='max', weights=N
             bad_aidc.append(i)
             continue
     return aug_graphs, bad_aidc
-
-
-
-

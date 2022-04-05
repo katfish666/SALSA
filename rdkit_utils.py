@@ -7,7 +7,7 @@ def get_cansmiles(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return ''
-    return Chem.MolToSmiles(mol, isomericSmiles=True)
+    return Chem.MolToSmiles(mol, isomericSmiles=False)
 
 import copy
 def show_atom_index( mol ):
@@ -35,6 +35,10 @@ def get_rwmol(mol):
         new_atom.SetFormalCharge(atom.GetFormalCharge())
         new_atom.SetAtomMapNum(atom.GetAtomMapNum())
         
+        aroms = ['N']
+        if atom.GetIsAromatic() and atom.GetSymbol() in aroms:
+            new_atom.SetNumExplicitHs(atom.GetTotalNumHs())
+        
         new_mol.AddAtom(new_atom)
 
     for bond in mol.GetBonds():
@@ -44,26 +48,7 @@ def get_rwmol(mol):
         new_mol.AddBond(a1, a2, bt)
     return new_mol
 
-def copy_rwmol(mol):
-    new_mol = Chem.RWMol(Chem.MolFromSmiles(''))
-    for atom in mol.GetAtoms():
-        new_atom = Chem.Atom(atom.GetSymbol())
-        new_atom.SetFormalCharge(atom.GetFormalCharge())
-        new_atom.SetAtomMapNum(atom.GetAtomMapNum())
-
-        if atom.GetIsAromatic() and atom.GetSymbol() == 'N':
-            new_atom.SetNumExplicitHs(atom.GetTotalNumHs())
-
-        new_mol.AddAtom(new_atom)
-    for bond in mol.GetBonds():
-        a1 = bond.GetBeginAtom().GetIdx()
-        a2 = bond.GetEndAtom().GetIdx()
-        bt = bond.GetBondType()
-        new_mol.AddBond(a1, a2, bt)
-    return new_mol 
-
 from rdkit.Chem.rdmolops import SanitizeMol
-
 def update_mol_rep(molgraph, clean_aroms=False, sanitize=False):
     
     if sanitize:
@@ -87,5 +72,5 @@ def update_mol_rep(molgraph, clean_aroms=False, sanitize=False):
 
     # Updating RDKit representation
     molgraph.UpdatePropertyCache()
-    Chem.FastFindRings(molgraph)
+#     Chem.FastFindRings(molgraph)
     
