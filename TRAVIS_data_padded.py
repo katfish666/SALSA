@@ -159,9 +159,6 @@ class VAEDataset(Dataset):
         pad_idx = self.tokens.index(self.pad_token)
         start_idx = self.tokens.index(self.start_token)
         end_idx = self.tokens.index(self.end_token)
-        
-
-        
 #         seq_pad_mask = ((seq == pad_idx)|(seq == end_idx))
         seq_pad_mask = (seq == pad_idx)
     
