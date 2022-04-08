@@ -20,7 +20,7 @@ from data_utils import tokenize
 
 
 class SeqDatum(object):
-    def __init__(self, smi, atype, smi_tokens,
+    def __init__(self, smi, smi_tokens,
              start_token='<', 
              end_token='>', 
              pad_token = 'X',
@@ -40,7 +40,6 @@ class SeqDatum(object):
         self.max_len = max_len + 2
         
         self.smi = smi
-        self.atype = atype
         
         # BrCl singled vec  
         _smi = self.do_BrCl_singles(self.smi)
@@ -50,20 +49,23 @@ class SeqDatum(object):
 
         # TODO: formal getters and setters !!!!
         self.seq_attr = {'seq': vec,
-#                          'smiles': self.smi, 
-#                          'atype': self.atype,
                          'pad_mask': masks[0],
                          'avg_mask': masks[1],
-                         'out_mask': masks[2]} 
+                         'out_mask': masks[2],
+#                          'smiles': self.smi
+                        } 
         
 
     def idc_tensor(self, smi):
         tensor = torch.zeros(len(smi)).long()
         for i in range(len(smi)):
+            print('-'+smi[i]+'-')
+            print(self.tokens)
             tensor[i] = self.tokens.index(smi[i])
         return tensor
     
     def get_vec(self, smi):
+        print(smi)
         padding = ''.join([self.p_token for _ in range(self.max_sm_len - len(smi))])
         smi = self.s_token + smi + self.e_token + padding
         vec = self.idc_tensor(smi)
@@ -75,11 +77,27 @@ class SeqDatum(object):
         return smi.replace(self.e_token,'')
     
     def undo_BrCl_singles(self,smi):
-        smi = smi.replace('R','Br')
-        return smi.replace('L','Cl')
+        if isinstance(smi, np.ndarray):
+            smi = smi.astype(str)
+            smi = np.char.replace(smi,'R','Br')
+            smi = np.char.replace(smi,'L','Cl')
+            smi = smi.astype(object)
+        else:
+            smi = smi.replace('R','Br')
+            smi = smi.replace('L','Cl') 
+        return smi     
+    
     def do_BrCl_singles(self,smi):
-        smi = smi.replace('Br','R')
-        return smi.replace('Cl','L')      
+        print(type(smi[0]), smi.dtype,'...')
+        if isinstance(smi, np.ndarray):
+            smi = smi.astype(str)
+            smi = np.char.replace(smi,'Br','R')
+            smi = np.char.replace(smi,'Cl','L')
+            smi = smi.astype(object)
+        else:
+            smi = smi.replace('Br','R')
+            smi = smi.replace('Cl','L')     
+        return smi      
         
     def convert_vec_to_smi(self, vec, snip=False):
         smi_arr = np.array(list(self.tokens))[vec.cpu().detach().numpy()]
@@ -142,80 +160,22 @@ class ContraSeqDataset(Dataset):
         return len(self.anc_smi)
     
     def __getitem__(self,idx):
-        if isinstance(idx, slice):
-            slc = idx
-            
-            s, e, step = slc.start, slc.stop, slc.step
-            s = 0 if s==None else s
-            e = len(self.anc_smi) if e==None else e
-            step = 1 if step==None else step
-            
-            idc = range(s, e, step)
-            samples = []
-            
-            for idx in iter(idc):
-                anc_smi = self.anc_smi[idx]
-                anc_seq = SeqDatum(anc_smi, 'Anc', self.tokens).__getitem__()
-
-                aug_smis = self.aug_smi[self.aug_smi[:,0]==idx][:,1]
-                aug_seqs = [SeqDatum(sm, 'Aug', self.tokens).__getitem__() for sm in aug_smis]
-
-                sample = [anc_seq] + aug_seqs
-                samples.append(sample)
-            return samples
         
-        else:
-            if torch.is_tensor(idx):
-                idx = idx.tolist()
-
-            anc_smi = self.anc_smi[idx]
-            anc_seq = SeqDatum(anc_smi, 'Anc', self.tokens).__getitem__()
-
-            aug_smis = self.aug_smi[self.aug_smi[:,0]==idx][:,1]
-            aug_seqs = [SeqDatum(sm, 'Aug', self.tokens).__getitem__() for sm in aug_smis]
-
-            sample = [anc_seq] + aug_seqs
-            return sample
-        
-        
-#     def __getitem__(self,idx):
-
-#         if isinstance(idx, slice):
-#             slc = idx
-#             s, e, step = slc.start, slc.stop, slc.step
-#             s = 0 if s==None else s
-#             e = len(self.anc_smi) if e==None else e
-#             step = 1 if step==None else step
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
             
-#             idc = range(s, e, step)
-#             samples = []
-            
-#             for idx in iter(idc):
-#                 anc_smi = self.anc_smi[idx]
-#                 anc_seq = SeqDatum(anc_smi, self.tokens).__getitem__()
-
-#                 aug_smis = self.aug_smi[self.aug_smi[:,0]==idx][:,1]
-#                 aug_seqs = [SeqDatum(sm, self.tokens).__getitem__() for sm in aug_smis]
-
-#                 sample = {'anc': anc_seq,
-#                           'augs': aug_seqs}
-#                 samples.append(sample)
-#             return samples
+        anc_smi = self.anc_smi[idx]
+#         print(anc_smi)
+        anc_seq = SeqDatum(anc_smi, self.tokens).__getitem__()
         
-#         else:
-#             if torch.is_tensor(idx):
-#                 idx = idx.tolist()
-
-#             anc_smi = self.anc_smi[idx]
-#             anc_seq = SeqDatum(anc_smi, self.tokens).__getitem__()
-
-#             aug_smis = self.aug_smi[self.aug_smi[:,0]==idx][:,1]
-#             aug_seqs = [SeqDatum(sm, self.tokens).__getitem__() for sm in aug_smis]
-
-#             sample = {'anc': anc_seq,
-#                       'augs': aug_seqs}
+        aug_smis = self.aug_smi[self.aug_smi[:,0]==idx][:,1]
+#         print(aug_smis)
+        aug_seqs = [SeqDatum(sm, self.tokens).__getitem__() for sm in aug_smis]
         
-#             return sample
+        sample = {'anc': anc_seq,
+                  'augs': aug_seqs}
+        
+        return sample
     
     
     

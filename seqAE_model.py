@@ -83,7 +83,11 @@ class SeqAutoencoder(nn.Module):
     def forward(self, seq, pad_mask=None, avg_mask=None, out_mask=None,
                 bottleneck=True):
         
-        print(seq)
+        # What to do with dummy seqs?
+        if seq==None:
+            return torch.tensor([0])
+        
+#         print(seq)
         
         if len(seq.shape)==1:
             seq = seq.unsqueeze(0)
@@ -102,8 +106,7 @@ class SeqAutoencoder(nn.Module):
         enc_out = self.enc(src=emb_seq, mask=mask, src_key_padding_mask=pad_mask)
         # out -> (bs, 120, 512)
         
-        latent_vec = self.linear(enc_avg)
-        # out -> (bs, 32)
+
         
         # Situate the latent vector
         if bottleneck: 
@@ -111,6 +114,8 @@ class SeqAutoencoder(nn.Module):
             enc_sum = (avg_mask.unsqueeze(2)*enc_out).sum(axis = 1)
             enc_avg = enc_sum/(avg_mask.sum(axis = 1).unsqueeze(1))
             # out -> (bs, 512)
+            latent_vec = self.linear(enc_avg)
+            # out -> (bs, 32)            
             latent_out = self.sample(latent_vec)
             latent_out = latent_out.reshape(-1, self.max_len, self.dim_emb)
         else:
@@ -126,3 +131,12 @@ class SeqAutoencoder(nn.Module):
         return latent_vec, dec_out
             
        
+    
+    
+    
+    
+    
+    
+    
+    
+    

@@ -129,6 +129,7 @@ def fit(model, dataloader, optimizer, scheduler,
             data_iter = tqdm(enumerate(dataloader),leave = True,total=len(dataloader))
             
         for i, sample in data_iter:
+            print(len(sample))
             if (n_steps != -1) & (i > n_steps-1):
                 break
                 
