@@ -15,7 +15,7 @@ from tqdm.auto import trange, tqdm
 def padce_loss(tgt, model_out, pad_mask,out_mask):
 #     pad_mask = pad_mask.squeeze()
 #     out_mask = out_mask.squeeze()
-    print(tgt.shape, model_out.shape, pad_mask.shape, out_mask.shape)
+#     print(tgt.shape, model_out.shape, pad_mask.shape, out_mask.shape)
 
     pad_mask = torch.ones_like(pad_mask.float()) - pad_mask.float()
     pad_mask = torch.flatten(pad_mask[:,1:]).float()

@@ -18,17 +18,83 @@ import csv
 
 from data_utils import tokenize
 
+def get_dataset_array(anc_path, aug_path):
+    ''' Returns pandas array of all molecules (ancs and augs). '''
+    anc_smi = pd.read_csv(anc_path)
+    anc_smi['anc_idx'] = anc_smi.index
+    anc_smi['atype'] = 'Anc'
+    anc_smi = anc_smi[['smiles','atype','anc_idx',]]
+    
+    aug_smi = pd.read_csv(aug_path)
+    aug_smi['atype'] = 'Aug'
+    aug_smi = aug_smi[['smiles','atype','anc_idx',]]
+    
+    tot_smi = pd.concat([anc_smi,aug_smi])
 
-class SeqDatum(object):
-    def __init__(self, smi, atype, smi_tokens,
-             start_token='<', 
-             end_token='>', 
-             pad_token = 'X',
-             max_len = 120,
-             use_cuda=None):
-     
+    return tot_smi
+
+def get_anc_map(tot_smi):
+    anc_idc = tot_smi['anc_idx'].unique()
+    augs = np.asarray(tot_smi['anc_idx'].values)
+    anc_map = {}
+    for i in anc_idc:
+        aug_idc = np.where(augs==i)[0]
+        anc_map[i] = aug_idc
+    return anc_map
+
+
+from torch.utils.data import Sampler
+from typing import Iterator, List
+
+# https://pytorch.org/docs/1.9.0/_modules/torch/utils/data/sampler.html 
+class AnchoredSampler(Sampler[List[int]]):
+    """
+    Args:
+        sampler (Sampler or Iterable): Base sampler. 
+        batch_size (int): Size of mini-batch.
+        drop_last (bool): If ``True``, the sampler will drop the last batch if
+            its size would be less than ``batch_size``
+    """
+
+    def __init__(self, sampler: Sampler[int], anc_map: dict,
+                 batch_size: int, drop_last: bool) -> None:
+        self.sampler = sampler
+        self.anc_map = anc_map
+        self.batch_size = batch_size
+        self.drop_last = drop_last
+
+    def __iter__(self) -> Iterator[List[int]]:
+        batch = []
+        i = 0
+        for idx in self.sampler:
+            augs = self.anc_map[idx].tolist()
+            batch.extend(augs)
+            i+=1
+            if i % (self.batch_size) == 0:
+                yield batch
+                batch = []               
+        if len(batch) > 0 and not self.drop_last:
+            yield batch
+
+    def __len__(self) -> int:
+        if self.drop_last:
+            return len(self.sampler) // self.batch_size  
+        else:
+            return (len(self.sampler) + self.batch_size - 1) // self.batch_size  
         
-        tokens = list(set(smi_tokens + start_token + end_token + pad_token))
+        
+class ContraSeqDataset(Dataset):
+    def __init__(self, anc_path, aug_path,
+                 start_token='<', end_token='>', pad_token = 'X', 
+                 max_len = 120, use_cuda=None):  
+        
+        super().__init__() 
+        
+        self.df = get_dataset_array(anc_path, aug_path)
+        
+        all_smi = np.transpose(self.df['smiles'].values)
+        tokens,_ = tokenize( all_smi )  
+        tokens = list(set(tokens + start_token + end_token + pad_token))
         self.tokens = ''.join(list(np.sort(tokens)))  
         self.n_tokens = len(self.tokens)
                
@@ -38,25 +104,7 @@ class SeqDatum(object):
 
         self.max_sm_len = max_len
         self.max_len = max_len + 2
-        
-        self.smi = smi
-        self.atype = atype
-        
-        # BrCl singled vec  
-        _smi = self.do_BrCl_singles(self.smi)
-        vec = self.get_vec(_smi)        
-        # Masked vectors
-        masks = self.masks(vec)
-
-        # TODO: formal getters and setters !!!!
-        self.seq_attr = {'seq': vec,
-#                          'smiles': self.smi, 
-#                          'atype': self.atype,
-                         'pad_mask': masks[0],
-                         'avg_mask': masks[1],
-                         'out_mask': masks[2]} 
-        
-
+           
     def idc_tensor(self, smi):
         tensor = torch.zeros(len(smi)).long()
         for i in range(len(smi)):
@@ -106,124 +154,53 @@ class SeqDatum(object):
         idx = torch.tensor([s_idx, p_idx])
         sup_mask = torch.zeros_like(sup_mask).scatter_(0,idx,sup_mask)
         sup_mask = sup_mask.unsqueeze(0)
-        return pad_mask.unsqueeze(0), avg_mask.unsqueeze(0), sup_mask
+#         return pad_mask.unsqueeze(0), avg_mask.unsqueeze(0), sup_mask
+        return pad_mask, avg_mask, sup_mask
     
-    
-    def __getitem__(self):
-        return self.seq_attr
-        
-class ContraSeqDataset(Dataset):
-    def __init__(self, anc_path, aug_path,
-             start_token='<', 
-             end_token='>', 
-             pad_token = 'X',
-             max_len = 120,
-             use_cuda=None):
-        
-        super().__init__() 
-        
-        self.anc_smi = np.transpose(pd.read_csv(anc_path)['smiles'].values)
-        self.aug_smi = np.asarray(pd.read_csv(aug_path))
-        
-        _augs_arr = np.asarray([x[1] for x in self.aug_smi])
-        tokens,_ = tokenize( np.hstack((self.anc_smi,_augs_arr)) )  
-        tokens = list(set(tokens + start_token + end_token + pad_token))
-        self.tokens = ''.join(list(np.sort(tokens)))  
-        self.n_tokens = len(self.tokens)
-               
-        self.s_token = start_token
-        self.e_token = end_token
-        self.p_token = pad_token
-
-        self.max_len = max_len
-                    
     def __len__(self):
-        # returns number of anchors
-        return len(self.anc_smi)
-    
-    def __getitem__(self,idx):
-        if isinstance(idx, slice):
-            slc = idx
-            
-            s, e, step = slc.start, slc.stop, slc.step
-            s = 0 if s==None else s
-            e = len(self.anc_smi) if e==None else e
-            step = 1 if step==None else step
-            
-            idc = range(s, e, step)
-            samples = []
-            
-            for idx in iter(idc):
-                anc_smi = self.anc_smi[idx]
-                anc_seq = SeqDatum(anc_smi, 'Anc', self.tokens).__getitem__()
-
-                aug_smis = self.aug_smi[self.aug_smi[:,0]==idx][:,1]
-                aug_seqs = [SeqDatum(sm, 'Aug', self.tokens).__getitem__() for sm in aug_smis]
-
-                sample = [anc_seq] + aug_seqs
-                samples.append(sample)
-            return samples
+        return len(self.df)
         
-        else:
-            if torch.is_tensor(idx):
-                idx = idx.tolist()
+    def __getitem__(self, idx):
 
-            anc_smi = self.anc_smi[idx]
-            anc_seq = SeqDatum(anc_smi, 'Anc', self.tokens).__getitem__()
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+          
+        smi, atype, label = self.df.iloc[idx].values
+        
+        # BrCl singled vec  
+        _smi = self.do_BrCl_singles(smi)
+        vec = self.get_vec(_smi)        
+        # Masked vectors
+        masks = self.masks(vec)
+            
+        # TODO: formal getters and setters !!!!
+        seq_attr = {'seq': vec,
+                    'smiles': smi, 
+                    'atype': atype,
+                    'label': label, 
+                    'pad_mask': masks[0],
+                    'avg_mask': masks[1],
+                    'out_mask': masks[2]} 
+        
+        return seq_attr
+    
+    
 
-            aug_smis = self.aug_smi[self.aug_smi[:,0]==idx][:,1]
-            aug_seqs = [SeqDatum(sm, 'Aug', self.tokens).__getitem__() for sm in aug_smis]
+        
 
-            sample = [anc_seq] + aug_seqs
-            return sample
+
         
         
-#     def __getitem__(self,idx):
-
-#         if isinstance(idx, slice):
-#             slc = idx
-#             s, e, step = slc.start, slc.stop, slc.step
-#             s = 0 if s==None else s
-#             e = len(self.anc_smi) if e==None else e
-#             step = 1 if step==None else step
-            
-#             idc = range(s, e, step)
-#             samples = []
-            
-#             for idx in iter(idc):
-#                 anc_smi = self.anc_smi[idx]
-#                 anc_seq = SeqDatum(anc_smi, self.tokens).__getitem__()
-
-#                 aug_smis = self.aug_smi[self.aug_smi[:,0]==idx][:,1]
-#                 aug_seqs = [SeqDatum(sm, self.tokens).__getitem__() for sm in aug_smis]
-
-#                 sample = {'anc': anc_seq,
-#                           'augs': aug_seqs}
-#                 samples.append(sample)
-#             return samples
         
-#         else:
-#             if torch.is_tensor(idx):
-#                 idx = idx.tolist()
-
-#             anc_smi = self.anc_smi[idx]
-#             anc_seq = SeqDatum(anc_smi, self.tokens).__getitem__()
-
-#             aug_smis = self.aug_smi[self.aug_smi[:,0]==idx][:,1]
-#             aug_seqs = [SeqDatum(sm, self.tokens).__getitem__() for sm in aug_smis]
-
-#             sample = {'anc': anc_seq,
-#                       'augs': aug_seqs}
         
-#             return sample
-    
-    
-    
-    
-    
-    
-    
-    
+        
+        
+        
+        
+        
+        
+        
+        
     
     
     
