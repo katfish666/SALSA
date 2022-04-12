@@ -86,9 +86,7 @@ class SeqAutoencoder(nn.Module):
         # What to do with dummy seqs?
         if seq==None:
             return torch.tensor([0])
-        
-#         print(seq)
-        
+                
         if len(seq.shape)==1:
             seq = seq.unsqueeze(0)
         
@@ -105,9 +103,7 @@ class SeqAutoencoder(nn.Module):
         emb_seq = self.pos_enc( self.embedder(seq) )
         enc_out = self.enc(src=emb_seq, mask=mask, src_key_padding_mask=pad_mask)
         # out -> (bs, 120, 512)
-        
 
-        
         # Situate the latent vector
         if bottleneck: 
         # this is the actual bottlenecking !!!!
@@ -115,15 +111,17 @@ class SeqAutoencoder(nn.Module):
             enc_avg = enc_sum/(avg_mask.sum(axis = 1).unsqueeze(1))
             # out -> (bs, 512)
             latent_vec = self.linear(enc_avg)
+            
+            if normed:
+                print(latent_vec.shape)
+                latent_vec = F.normalize(latent_vec, dim=-1)           
+            
             # out -> (bs, 32)            
             latent_out = self.sample(latent_vec)
             latent_out = latent_out.reshape(-1, self.max_len, self.dim_emb)
         else:
             latent_out = enc_out
 
-#         if normed:
-#             print(latent_vec.shape)
-#             latent_vec = F.normalize(latent_vec, dim=0)
 
 
         # Decode
