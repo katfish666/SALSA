@@ -42,7 +42,7 @@ def normal_kl_divergence(mean, log_var):
 import torch
 import torch.nn as nn
 
-class SupConLoss(nn.Module):
+class SupConLoss(nn.Module): # temps were 0.07
     def __init__(self, temp=0.07, contrast_mode='all', base_temp=0.07):
         super(SupConLoss, self).__init__()
         self.temperature = temp
@@ -61,20 +61,22 @@ class SupConLoss(nn.Module):
         """
         device = (torch.device('cuda') if features.is_cuda
                   else torch.device('cpu'))
-
-        if len(features.shape) < 3:
-            raise ValueError('`features` needs to be [bsz, n_views, ...],'
-                             'at least 3 dimensions are required')
         if len(features.shape) > 3:
             features = features.view(features.shape[0], features.shape[1], -1)
 
         batch_size = features.shape[0]
-            
+#         print(labels)
         labels = labels.contiguous().view(-1, 1)
+#         print(labels)
         mask = torch.eq(labels, labels.T).float().to(device)
+#         print(mask)
 
         contrast_count = features.shape[1]
         contrast_feature = torch.cat(torch.unbind(features, dim=1), dim=0)
+#         print(features.shape, contrast_feature.shape)
+#         print(features)
+#         print(contrast_feature)
+        
         if self.contrast_mode == 'one':
             anchor_feature = features[:, 0]
             anchor_count = 1
@@ -82,6 +84,9 @@ class SupConLoss(nn.Module):
             anchor_feature = contrast_feature
             anchor_count = contrast_count
 
+#         print(anchor_feature.shape, anchor_count)
+        
+        
         # compute logits
         anchor_dot_contrast = torch.div(
             torch.matmul(anchor_feature, contrast_feature.T),
@@ -92,6 +97,7 @@ class SupConLoss(nn.Module):
 
         # tile mask
         mask = mask.repeat(anchor_count, contrast_count)
+#         print(mask.shape, mask)
         # mask-out self-contrast cases
         logits_mask = torch.scatter(torch.ones_like(mask), 1,
                                     torch.arange(batch_size * anchor_count).\
