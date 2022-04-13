@@ -46,7 +46,8 @@ def get_anc_map(tot_smi):
 from torch.utils.data import Sampler
 from typing import Iterator, List
 
-# https://pytorch.org/docs/1.9.0/_modules/torch/utils/data/sampler.html 
+# Modeled off of ... 
+# https://pytorch.org/docs/stable/_modules/torch/utils/data/sampler.html#BatchSampler
 class AnchoredSampler(Sampler[List[int]]):
     """
     Args:

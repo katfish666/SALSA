@@ -81,7 +81,7 @@ class SeqAutoencoder(nn.Module):
         self.decode_out = nn.Linear(dim_emb, n_tokens)
         
     def forward(self, seq, pad_mask=None, avg_mask=None, out_mask=None,
-                bottleneck=True, normed=True):
+                normed=False, bottleneck=True):
         
         # What to do with dummy seqs?
         if seq==None:
@@ -113,7 +113,6 @@ class SeqAutoencoder(nn.Module):
             latent_vec = self.linear(enc_avg)
             
             if normed:
-                print(latent_vec.shape)
                 latent_vec = F.normalize(latent_vec, dim=-1)           
             
             # out -> (bs, 32)            
