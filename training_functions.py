@@ -2,14 +2,14 @@ from contra_seq_dataset import AnchoredSampler, ContraSeqDataset
 from contra_seq_dataset import get_dataset_array, get_anc_map
 from torch.utils.data import DataLoader, RandomSampler
 
-from utils.plot_utils import *
+from utilities.plot_utils import *
 from losses import SupConLoss, padce_loss
 
 import os
-import time
-from datetime import datetime
 import torch
 import torch.nn as nn
+from datetime import datetime
+import pandas as pd
 
 def get_loss_data(use_losses, run_data, samp, dec_out, latent, BS):
     if 'Recon' in use_losses: 
@@ -34,8 +34,8 @@ def get_ds_and_loader(ds_v, bs=32):
     BS is the "batch_size", i.e. the number of anchors.
     '''
     
-    anc_path = f'data/model_ready/{ds_v}/anchor_smiles.csv'
-    aug_path = f'data/model_ready/{ds_v}/augmented_smiles_balanced.csv'
+    anc_path = f'data/model_ready/{ds_v}/train/anchor_smiles.csv'
+    aug_path = f'data/model_ready/{ds_v}/train/augmented_smiles.csv'
 
     ds = ContraSeqDataset(anc_path, aug_path)
     ds_arr = get_dataset_array(anc_path, aug_path)
@@ -89,12 +89,17 @@ def fit(model, device, optimizer, loader, use_losses, v, bs=32, n_epochs=1,
 
             if do_plot:
                 live_plot(run_data, bs, n_epochs, figsize=(12.5,5))
-                
+
+        # Report progress.
         e = datetime.now()
         lap = e - s
         s = e
         print(f"Epoch done. Runtime: {lap.seconds//60%60} mins {lap.seconds%60} secs.")
-
+        
+        # Save shit.
+        df_run = pd.DataFrame.from_dict(run_data)
+        df_run.to_csv(f'results/training_logs/losses_{tag}.csv')
+        
         try:
             state_dict = model.module.state_dict()
         except AttributeError:

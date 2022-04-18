@@ -1,11 +1,4 @@
-import torch
-from torch.utils.data import Dataset
-
-import random
-import numpy as np
-import pandas as pd
-
-from utils.data_utils import tokenize
+from utilities.data_utils import tokenize
 
 import torch
 from torch.utils.data import Dataset
@@ -15,8 +8,6 @@ import numpy as np
 import pandas as pd
 import os
 import csv
-
-
 
 def get_dataset_array(anc_path, aug_path):
     ''' Returns pandas array of all molecules (ancs and augs). '''
@@ -96,7 +87,8 @@ class ContraSeqDataset(Dataset):
         self.df = get_dataset_array(anc_path, aug_path)
         
         all_smi = np.transpose(self.df['smiles'].values)
-        tokens,_ = tokenize( all_smi )  
+#         tokens,_ = tokenize( all_smi )  
+        tokens = '#%()+-0123456789<=>CFHILNOPRSX[]cnos'
         tokens = list(set(tokens + start_token + end_token + pad_token))
         self.tokens = ''.join(list(np.sort(tokens)))  
         self.n_tokens = len(self.tokens)

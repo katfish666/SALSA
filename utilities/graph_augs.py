@@ -1,4 +1,4 @@
-from rdkit_utils import *
+from utilities.rdkit_utils import *
 
 # TODO: change input and return types to Mol instead of RWMol (?)
 def add_atom_to_mol(mol, atom_type, to_aidx, clean_aroms=False, clean_it=True): 

@@ -3,6 +3,75 @@ import numpy as np
 import pandas as pd
 from rdkit import Chem
 
+from rdkit.Chem import PandasTools
+
+from utilities.rdkit_utils import *
+from utilities.graph_augs import *
+
+from rdkit import RDLogger  
+RDLogger.DisableLog('rdApp.*')
+
+from joblib import Parallel, delayed
+import multiprocessing
+import random
+from property_predictors import surface_predictor
+
+def get_augs(smiles,atom_to_cnt,prop_filter=True,maximum=5):
+        
+    mol = Chem.MolFromSmiles(smiles)
+
+    atom_idc = [i for i in range(0,(mol.GetNumAtoms()))]
+    random.shuffle(atom_idc)
+    
+    goods = 0 
+    aug_smis = []
+    for i in atom_idc:
+        if goods==maximum:
+            break
+            
+        atom_type = get_weighted_random_atom(atom_to_cnt)
+        
+        try: 
+            mol_aug = add_atom_to_mol(mol, atom_type, i, clean_aroms = True)
+            if mol_aug.GetNumAtoms()==0:
+                continue
+            else:
+                sm = Chem.MolToSmiles(mol_aug)
+                props = surface_predictor(sm)
+                if prop_filter and sum(props)>=1:
+                    goods+=1
+                    aug_smis.append(sm)
+                elif not prop_filter:
+                    goods+=1
+                    aug_smis.append(sm)
+                    
+        except Exception as e:
+            continue
+            
+    while len(aug_smis) < maximum:
+        try:
+            aug_smis.append( random.choice(aug_smis) )
+        except:
+            aug_smis.append(smiles)
+            
+    return (smiles, aug_smis)
+
+def get_anc_to_aug_map(df):
+    PandasTools.AddMoleculeColumnToFrame(df,'smiles','mol',includeFingerprints=False)
+    
+    atom_to_cnt = get_atom_cnts(df.smiles)
+
+    parallelizer = Parallel(n_jobs=multiprocessing.cpu_count()-1, backend= 'multiprocessing' )
+    augs_tasks = (delayed(get_augs)(smi,atom_to_cnt) for smi in df.smiles)
+    smiles_to_augs = parallelizer(augs_tasks)
+
+    smiles_to_augs = {k:v for k,v in smiles_to_augs}
+    
+    return smiles_to_augs
+
+
+
+
 def get_atom_cnts(smileses):
     '''
     Given a list of SMILES strings, return dictionary of atom counts
