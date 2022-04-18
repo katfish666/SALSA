@@ -5,7 +5,7 @@ import random
 import numpy as np
 import pandas as pd
 
-from data_utils import tokenize
+from utils.data_utils import tokenize
 
 import torch
 from torch.utils.data import Dataset
@@ -16,7 +16,7 @@ import pandas as pd
 import os
 import csv
 
-from data_utils import tokenize
+
 
 def get_dataset_array(anc_path, aug_path):
     ''' Returns pandas array of all molecules (ancs and augs). '''
@@ -82,6 +82,8 @@ class AnchoredSampler(Sampler[List[int]]):
             return len(self.sampler) // self.batch_size  
         else:
             return (len(self.sampler) + self.batch_size - 1) // self.batch_size  
+        
+    
         
         
 class ContraSeqDataset(Dataset):

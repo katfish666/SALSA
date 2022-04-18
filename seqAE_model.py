@@ -105,8 +105,7 @@ class SeqAutoencoder(nn.Module):
         # out -> (bs, 120, 512)
 
         # Situate the latent vector
-        if bottleneck: 
-        # this is the actual bottlenecking !!!!
+        if bottleneck:
             enc_sum = (avg_mask.unsqueeze(2)*enc_out).sum(axis = 1)
             enc_avg = enc_sum/(avg_mask.sum(axis = 1).unsqueeze(1))
             # out -> (bs, 512)
