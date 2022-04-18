@@ -20,12 +20,11 @@ def get_loss_data(use_losses, run_data, samp, dec_out, latent, BS):
         contra_loss = SupConLoss()(latent, labels=torch.tensor(range(BS)))
         run_data['SupCon'].append(contra_loss.item())
         
-    
-    if set(use_losses)==set(['Recon']):
+    if set(use_losses)=={'Recon'}:
         loss = recon_loss
-    elif set(use_losses)==set(['SupCon']):
+    elif set(use_losses)=={'SupCon'}:
         loss = contra_loss
-    elif set(use_losses)==set(['Recon','SupCon']):
+    elif set(use_losses)=={'Recon','SupCon'}:
         loss = recon_loss + contra_loss
     
     return (loss, run_data)

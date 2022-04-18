@@ -1,0 +1,8 @@
+Dataset
+
+How large is augmented ChEMBL (starting dataset)?
+6,267,876
+
+How large is unaugmented ChEMBL?
+1,502,539
+

@@ -1,6 +1,4 @@
 from rdkit import Chem
-from rdkit.Chem.rdchem import RWMol
-
 from rdkit.Chem.rdchem import RWMol, Atom, BondType
 
 def get_cansmiles(smiles):
@@ -8,6 +6,33 @@ def get_cansmiles(smiles):
     if mol is None:
         return ''
     return Chem.MolToSmiles(mol, isomericSmiles=False)
+
+def count_atoms(smiles):
+    '''
+    Gives a SMILES string, return atom count.
+    '''
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return 0
+    return len(mol.GetAtoms())
+    
+def get_atom_cnts(smileses):
+    '''
+    Given a list of SMILES strings, return dictionary of atom counts
+    '''
+    atom_to_cnt = {}
+    
+    for smiles in smileses:
+        mol = Chem.MolFromSmiles(smiles)
+
+        for atom in mol.GetAtoms():
+            atom_type = atom.GetSymbol()
+            if atom_type not in atom_to_cnt.keys():
+                atom_to_cnt[atom_type] = 0
+            else:
+                atom_to_cnt[atom_type] += 1
+            
+    return atom_to_cnt
 
 import copy
 def show_atom_index( mol ):

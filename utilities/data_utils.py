@@ -23,7 +23,7 @@ def get_atom_cnts(smileses):
 
 def get_weighted_random_atom(symb_to_count):
     '''
-    Given a dictioanry of atom types to counts, return a randomly chosen atom,
+    Given a dictionary of atom types to counts, return a randomly chosen atom,
     weighted according to  the given count ratios.
     '''
     tot = sum(symb_to_count.values())
