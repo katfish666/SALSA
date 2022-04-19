@@ -10,15 +10,15 @@ import torch
 import torch.nn as nn
 from datetime import datetime
 import pandas as pd
+import random
+random.seed(666)
 
 def get_loss_data(use_losses, run_data, samp, dec_out, latent, BS):
-    if 'Recon' in use_losses: 
-        recon_loss = padce_loss(samp['seq'], dec_out.squeeze(), 
-                                samp['pad_mask'], samp['out_mask'])  
-        run_data['Recon'].append(recon_loss.item())
-    if 'SupCon' in use_losses: 
-        contra_loss = SupConLoss()(latent, labels=torch.tensor(range(BS)))
-        run_data['SupCon'].append(contra_loss.item())
+    recon_loss = padce_loss(samp['seq'], dec_out.squeeze(), 
+                            samp['pad_mask'], samp['out_mask'])  
+    contra_loss = SupConLoss()(latent, labels=torch.tensor(range(BS)))
+    run_data['Recon'].append(recon_loss.item())
+    run_data['SupCon'].append(contra_loss.item())
         
     if set(use_losses)=={'Recon'}:
         loss = recon_loss
@@ -29,7 +29,9 @@ def get_loss_data(use_losses, run_data, samp, dec_out, latent, BS):
     
     return (loss, run_data)
 
-def get_ds_and_loader(ds_v, bs=32):
+
+
+def get_ds_and_loader(ds_v, bs=32, samp='max'):
     '''
     BS is the "batch_size", i.e. the number of anchors.
     '''
@@ -41,15 +43,20 @@ def get_ds_and_loader(ds_v, bs=32):
     ds_arr = get_dataset_array(anc_path, aug_path)
     anc_map = get_anc_map(ds_arr)
     
-    sampler = AnchoredSampler(sampler = RandomSampler(list(anc_map.keys())), 
+    samp_idc = list(anc_map.keys())
+    
+    if samp!='max':
+        if samp < len(samp_idc):
+            samp_idc = random.sample(samp_idc, samp)
+#     print(len(samp_idc))
+    sampler = AnchoredSampler(sampler = RandomSampler(samp_idc), 
                               anc_map = anc_map, batch_size = bs, drop_last = True)
     loader = DataLoader(ds, batch_sampler=sampler, num_workers=0, pin_memory=True)
-    
     return (ds, loader)
 
 
 def fit(model, device, optimizer, loader, use_losses, v, bs=32, n_epochs=1, 
-        normed_latent=True, do_plot=False, save_fifths=True):
+        normed_latent=True, do_plot=False, save_step=1):
     
     start = datetime.now()
     s = start
@@ -72,16 +79,21 @@ def fit(model, device, optimizer, loader, use_losses, v, bs=32, n_epochs=1,
         model_path = f'{model_dir}/{ii}.pt'
         
         for samp in loader:
+#             print(len(samp['seq']))
 
             optimizer.zero_grad()
 
             for k,v in samp.items():
                 if torch.is_tensor(v):
                     samp[k] = v.to(device)
+                    
+#             print("fit samp seq:",samp['seq'].shape)
             latent, dec_out = model.forward(samp['seq'], samp['pad_mask'], 
                                             samp['avg_mask'], samp['out_mask'], 
                                             normed=normed_latent)
+#             print(latent.shape, dec_out.shape)
             latent = torch.stack(torch.split(latent, 6), dim=0) # (BS, 6, 32)     
+#             print(latent.shape)
 
             loss, run_data = get_loss_data(use_losses, run_data, samp, dec_out, latent, bs)
             loss.backward()
@@ -105,41 +117,34 @@ def fit(model, device, optimizer, loader, use_losses, v, bs=32, n_epochs=1,
         except AttributeError:
             state_dict = model.state_dict()                
 
-        if (i+1) % 5==0:
-            if save_fifths:
-                torch.save(state_dict, model_path)
+        if save_step==1:
+            torch.save(state_dict, model_path)
+        elif (i+1) % save_step==0:
+            torch.save(state_dict, model_path)
+            
         if i+1 == n_epochs:
             lap = e - start 
             h, m, s = lap.seconds//3600, lap.seconds//60%60, lap.seconds%60
             print(f"All done. Total runtime: {h} hr {m}  min {s} sec.")
             torch.save(state_dict, model_path)
                 
-    return run_data
+    return model
 
 
-#         run_data = train_epoch(model, optimizer, device, loader, use_losses, 
-#                                bs, n_epochs, normed_latent, do_plot)    
-# def train_epoch(model, optimizer, device, loader, use_losses, bs=32, n_epochs=1, 
-#                 normed_latent=True, do_plot=False):
+# def _get_loss_data(use_losses, run_data, samp, dec_out, latent, BS):
+#     if 'Recon' in use_losses: 
+#         recon_loss = padce_loss(samp['seq'], dec_out.squeeze(), 
+#                                 samp['pad_mask'], samp['out_mask'])  
+#         run_data['Recon'].append(recon_loss.item())
+#     if 'SupCon' in use_losses: 
+#         contra_loss = SupConLoss()(latent, labels=torch.tensor(range(BS)))
+#         run_data['SupCon'].append(contra_loss.item())
+        
+#     if set(use_losses)=={'Recon'}:
+#         loss = recon_loss
+#     elif set(use_losses)=={'SupCon'}:
+#         loss = contra_loss
+#     elif set(use_losses)=={'Recon','SupCon'}:
+#         loss = recon_loss + contra_loss
     
-#     for samp in loader:
-
-#         optimizer.zero_grad()
-
-#         for k,v in samp.items():
-#             if torch.is_tensor(v):
-#                 samp[k] = v.to(device)
-#         latent, dec_out = model.forward(samp['seq'], samp['pad_mask'], 
-#                                         samp['avg_mask'], samp['out_mask'], 
-#                                         normed=normed_latent)
-#         latent = torch.stack(torch.split(latent, 6), dim=0) # (BS, 6, 32)     
-
-#         loss, run_data = get_loss(use_losses, run_data, samp, dec_out, latent, BS)
-#         loss.backward()
-#         optimizer.step()
-
-#         if do_plot:
-#             live_plot(run_data, bs, n_epochs, figsize=(12.5,5))
-            
-#     return run_data
-    
+#     return (loss, run_data)

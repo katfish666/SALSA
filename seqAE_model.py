@@ -4,20 +4,41 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# class PositionalEncoding(nn.Module):
+#     def __init__(self, d_model, dropout=0.1, max_len=5000):
+#         super().__init__()
+#         self.dropout = nn.Dropout(p=dropout)
+#         pe = torch.zeros(max_len, d_model)
+#         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+#         div_term = torch.exp(torch.arange(0, d_model, 2).float() \
+#                      * (-math.log(10000.0) / d_model))
+#         pe[:, 0::2] = torch.sin(position * div_term)
+#         pe[:, 1::2] = torch.cos(position * div_term)
+#         pe = pe.unsqueeze(0)
+#         self.register_buffer('pe', pe)
+
+#     def forward(self, x):
+#         x = x + self.pe[:,:x.size(1)]
+#         return self.dropout(x)
+    
 class PositionalEncoding(nn.Module):
+
     def __init__(self, d_model, dropout=0.1, max_len=5000):
+        
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
+
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2).float() \
-                     * (-math.log(10000.0) / d_model))
+                             * (-math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
         self.register_buffer('pe', pe)
 
     def forward(self, x):
+#         print("pos:",x.shape)
         x = x + self.pe[:,:x.size(1)]
         return self.dropout(x)
     
@@ -37,7 +58,7 @@ from torch.nn import TransformerEncoder as Encoder
 
 class SeqAutoencoder(nn.Module):
     
-    def __init__(self, n_tokens, max_len = 122,
+    def __init__(self, n_tokens=37, max_len = 122,
                  dim_emb=512, heads=8, dim_hidden=32,
                  L_enc=6, L_dec=6, dim_ff=2048, 
                  drpt=0.1, actv='relu', eps=0.6, b_first=True):
@@ -51,13 +72,14 @@ class SeqAutoencoder(nn.Module):
         '''
         super().__init__()
         
+#         self.n_tokens = len('#%()+-0123456789<=>BCFHILNOPRSX[]cnos')
         self.n_tokens = n_tokens
         self.max_len = max_len
         self.dim_hidden = dim_hidden
         self.dim_emb = dim_emb
         
         # Initial embedding and subsequent positional encoder
-        self.embedder = nn.Embedding(n_tokens, dim_emb)
+        self.embedder = nn.Embedding(self.n_tokens, dim_emb)
         self.pos_enc = PositionalEncoding(dim_emb, dropout=drpt)
 
         # Encoder
@@ -78,14 +100,16 @@ class SeqAutoencoder(nn.Module):
                              activation=actv, layer_norm_eps=eps,
                              batch_first=b_first)
         self.dec = Decoder(dec_layer, num_layers=L_dec)
-        self.decode_out = nn.Linear(dim_emb, n_tokens)
+        self.decode_out = nn.Linear(dim_emb, self.n_tokens)
         
     def forward(self, seq, pad_mask=None, avg_mask=None, out_mask=None,
-                normed=False, bottleneck=True):
+                normed=True, bottleneck=True):
         
         # What to do with dummy seqs?
-        if seq==None:
-            return torch.tensor([0])
+#         if seq==None:
+#             return torch.tensor([0])
+
+#         print("ENTER:",seq.shape)
                 
         if len(seq.shape)==1:
             seq = seq.unsqueeze(0)
@@ -100,18 +124,25 @@ class SeqAutoencoder(nn.Module):
             out_mask = torch.zeros(self.n_tokens).to(seq.device)
         
         # Encode
+#         print("SEQ:",seq.shape)
         emb_seq = self.pos_enc( self.embedder(seq) )
+#         print(emb_seq.shape)
         enc_out = self.enc(src=emb_seq, mask=mask, src_key_padding_mask=pad_mask)
+#         print(enc_out.shape)
         # out -> (bs, 120, 512)
 
         # Situate the latent vector
         if bottleneck:
+#             print("BOTTLE")
             enc_sum = (avg_mask.unsqueeze(2)*enc_out).sum(axis = 1)
             enc_avg = enc_sum/(avg_mask.sum(axis = 1).unsqueeze(1))
+#             print(enc_avg.shape)
             # out -> (bs, 512)
             latent_vec = self.linear(enc_avg)
-            
+#             print(latent_vec.shape)
             if normed:
+#                 print("hi")
+#                 print(latent_vec.shape)
                 latent_vec = F.normalize(latent_vec, dim=-1)           
             
             # out -> (bs, 32)            

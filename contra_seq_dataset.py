@@ -88,7 +88,7 @@ class ContraSeqDataset(Dataset):
         
         all_smi = np.transpose(self.df['smiles'].values)
 #         tokens,_ = tokenize( all_smi )  
-        tokens = '#%()+-0123456789<=>CFHILNOPRSX[]cnos'
+        tokens = '#%()+-0123456789<=>BCFHILNOPRSX[]cnos'
         tokens = list(set(tokens + start_token + end_token + pad_token))
         self.tokens = ''.join(list(np.sort(tokens)))  
         self.n_tokens = len(self.tokens)
@@ -102,8 +102,12 @@ class ContraSeqDataset(Dataset):
            
     def idc_tensor(self, smi):
         tensor = torch.zeros(len(smi)).long()
+#         print(smi)
         for i in range(len(smi)):
+#             try:
             tensor[i] = self.tokens.index(smi[i])
+#             except:
+#                 print(smi)
         return tensor
     
     def get_vec(self, smi):
