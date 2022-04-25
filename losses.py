@@ -73,9 +73,6 @@ class SupConLoss(nn.Module): # temps were 0.07
 
         contrast_count = features.shape[1]
         contrast_feature = torch.cat(torch.unbind(features, dim=1), dim=0)
-#         print(features.shape, contrast_feature.shape)
-#         print(features)
-#         print(contrast_feature)
         
         if self.contrast_mode == 'one':
             anchor_feature = features[:, 0]
@@ -83,8 +80,6 @@ class SupConLoss(nn.Module): # temps were 0.07
         elif self.contrast_mode == 'all':
             anchor_feature = contrast_feature
             anchor_count = contrast_count
-
-#         print(anchor_feature.shape, anchor_count)
         
         
         # compute logits
@@ -97,7 +92,6 @@ class SupConLoss(nn.Module): # temps were 0.07
 
         # tile mask
         mask = mask.repeat(anchor_count, contrast_count)
-#         print(mask.shape, mask)
         # mask-out self-contrast cases
         logits_mask = torch.scatter(torch.ones_like(mask), 1,
                                     torch.arange(batch_size * anchor_count).\

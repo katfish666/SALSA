@@ -2,17 +2,22 @@
 
 Dataset
 
-How large is augmented ChEMBL (starting dataset)?
-6,267,876
+- How large is augmented ChEMBL (starting dataset)?
+  6,267,876
 
-How large is unaugmented ChEMBL?
-1,502,539
+- How large is unaugmented ChEMBL?
+  1,502,539
 
-Fewer than 100 atoms?
-1,491,010
+- Fewer than 100 atoms?
+  1,491,010
 
-Between 10 and 30 atoms?
-999,783 
-- too many, need to sample ... 
+- Between 10 and 30 atoms?
+  999,783 
+    - too many, need to sample ... 
 
-... Sampled 200,000 anchors !
+- ... Sampled 200,000 anchors !
+
+2022/04/24
+
+- Longest SMILES in ChEMBL is...
+    1489 characters

@@ -10,6 +10,10 @@ import torch
 import torch.nn as nn
 from datetime import datetime
 import pandas as pd
+import sys
+sys.path.insert(0, '/home/kat/Repos/SALSA/')
+sys.path.insert(0, '/home/kat/Repos/SALSA/data')
+
 import random
 random.seed(666)
 
@@ -33,11 +37,12 @@ def get_loss_data(use_losses, run_data, samp, dec_out, latent, BS):
 
 def get_ds_and_loader(ds_v, bs=32, samp='max'):
     '''
-    BS is the "batch_size", i.e. the number of anchors.
+    ds_v: dataset version
+    bs: the "batch_size", i.e. the number of anchors
+    samp: sample size if desired
     '''
-    
-    anc_path = f'data/model_ready/{ds_v}/train/anchor_smiles.csv'
-    aug_path = f'data/model_ready/{ds_v}/train/augmented_smiles.csv'
+    anc_path = f'/home/kat/Repos/SALSA/data/model_ready/{ds_v}/train/anchor_smiles.csv'
+    aug_path = f'/home/kat/Repos/SALSA/data/model_ready/{ds_v}/train/augmented_smiles.csv'
 
     ds = ContraSeqDataset(anc_path, aug_path)
     ds_arr = get_dataset_array(anc_path, aug_path)
@@ -48,7 +53,6 @@ def get_ds_and_loader(ds_v, bs=32, samp='max'):
     if samp!='max':
         if samp < len(samp_idc):
             samp_idc = random.sample(samp_idc, samp)
-#     print(len(samp_idc))
     sampler = AnchoredSampler(sampler = RandomSampler(samp_idc), 
                               anc_map = anc_map, batch_size = bs, drop_last = True)
     loader = DataLoader(ds, batch_sampler=sampler, num_workers=0, pin_memory=True)
@@ -56,7 +60,7 @@ def get_ds_and_loader(ds_v, bs=32, samp='max'):
 
 
 def fit(model, device, optimizer, loader, use_losses, v, bs=32, n_epochs=1, 
-        normed_latent=True, do_plot=False, save_step=1):
+        normed_latent=True, do_plot=False, save_step=5):
     
     start = datetime.now()
     s = start
@@ -64,14 +68,14 @@ def fit(model, device, optimizer, loader, use_losses, v, bs=32, n_epochs=1,
     today = datetime.today().strftime('%Y%m%d%H')
     tag = f'{today}_{v}' #'.pt'
     
-    model_dir = os.path.join('results/models',tag)    
+    model_dir = os.path.join('/home/kat/Repos/SALSA/results/models',tag)    
     if not os.path.exists(model_dir):
         os.mkdir(model_dir)
         print(model_dir)
     else:
         print("DIRECTORY EXISTS! ...",model_dir)
     
-    run_data = {k:[] for k in use_losses}
+    run_data = {k:[] for k in ['SupCon','Recon']}
     
     for i in range(n_epochs):
         print(f"Epoch {i} running ...")
@@ -79,22 +83,16 @@ def fit(model, device, optimizer, loader, use_losses, v, bs=32, n_epochs=1,
         model_path = f'{model_dir}/{ii}.pt'
         
         for samp in loader:
-#             print(len(samp['seq']))
-
             optimizer.zero_grad()
 
             for k,v in samp.items():
                 if torch.is_tensor(v):
                     samp[k] = v.to(device)
                     
-#             print("fit samp seq:",samp['seq'].shape)
             latent, dec_out = model.forward(samp['seq'], samp['pad_mask'], 
                                             samp['avg_mask'], samp['out_mask'], 
                                             normed=normed_latent)
-#             print(latent.shape, dec_out.shape)
             latent = torch.stack(torch.split(latent, 6), dim=0) # (BS, 6, 32)     
-#             print(latent.shape)
-
             loss, run_data = get_loss_data(use_losses, run_data, samp, dec_out, latent, bs)
             loss.backward()
             optimizer.step()
@@ -110,7 +108,7 @@ def fit(model, device, optimizer, loader, use_losses, v, bs=32, n_epochs=1,
         
         # Save shit.
         df_run = pd.DataFrame.from_dict(run_data)
-        df_run.to_csv(f'results/training_logs/losses_{tag}.csv')
+        df_run.to_csv(f'/home/kat/Repos/SALSA/results/training_logs/losses_{tag}.csv')
         
         try:
             state_dict = model.module.state_dict()
@@ -129,22 +127,3 @@ def fit(model, device, optimizer, loader, use_losses, v, bs=32, n_epochs=1,
             torch.save(state_dict, model_path)
                 
     return model
-
-
-# def _get_loss_data(use_losses, run_data, samp, dec_out, latent, BS):
-#     if 'Recon' in use_losses: 
-#         recon_loss = padce_loss(samp['seq'], dec_out.squeeze(), 
-#                                 samp['pad_mask'], samp['out_mask'])  
-#         run_data['Recon'].append(recon_loss.item())
-#     if 'SupCon' in use_losses: 
-#         contra_loss = SupConLoss()(latent, labels=torch.tensor(range(BS)))
-#         run_data['SupCon'].append(contra_loss.item())
-        
-#     if set(use_losses)=={'Recon'}:
-#         loss = recon_loss
-#     elif set(use_losses)=={'SupCon'}:
-#         loss = contra_loss
-#     elif set(use_losses)=={'Recon','SupCon'}:
-#         loss = recon_loss + contra_loss
-    
-#     return (loss, run_data)

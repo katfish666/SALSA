@@ -3,23 +3,6 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-# class PositionalEncoding(nn.Module):
-#     def __init__(self, d_model, dropout=0.1, max_len=5000):
-#         super().__init__()
-#         self.dropout = nn.Dropout(p=dropout)
-#         pe = torch.zeros(max_len, d_model)
-#         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-#         div_term = torch.exp(torch.arange(0, d_model, 2).float() \
-#                      * (-math.log(10000.0) / d_model))
-#         pe[:, 0::2] = torch.sin(position * div_term)
-#         pe[:, 1::2] = torch.cos(position * div_term)
-#         pe = pe.unsqueeze(0)
-#         self.register_buffer('pe', pe)
-
-#     def forward(self, x):
-#         x = x + self.pe[:,:x.size(1)]
-#         return self.dropout(x)
     
 class PositionalEncoding(nn.Module):
 
@@ -38,7 +21,6 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-#         print("pos:",x.shape)
         x = x + self.pe[:,:x.size(1)]
         return self.dropout(x)
     
@@ -58,7 +40,7 @@ from torch.nn import TransformerEncoder as Encoder
 
 class SeqAutoencoder(nn.Module):
     
-    def __init__(self, n_tokens=37, max_len = 122,
+    def __init__(self, n_tokens=37, max_len = 122, #1750, #122,
                  dim_emb=512, heads=8, dim_hidden=32,
                  L_enc=6, L_dec=6, dim_ff=2048, 
                  drpt=0.1, actv='relu', eps=0.6, b_first=True):
@@ -89,10 +71,9 @@ class SeqAutoencoder(nn.Module):
                              batch_first=b_first)
         self.enc = Encoder(enc_layer, num_layers=L_enc)
         
-        # Reparameterize
-        self.linear = nn.Linear(dim_emb,dim_hidden) # mu
-#         self.sigma = nn.Linear(dim_emb,dim_hidden)
-        self.sample = nn.Linear(dim_hidden,dim_emb*max_len)
+        # Upsample
+        self.linear = nn.Linear(dim_emb,dim_hidden) 
+        self.samp_linear = nn.Linear(dim_hidden,dim_emb*max_len)
         
         # Decoder
         dec_layer = DecLayer(d_model=dim_emb, nhead=heads,
@@ -105,12 +86,6 @@ class SeqAutoencoder(nn.Module):
     def forward(self, seq, pad_mask=None, avg_mask=None, out_mask=None,
                 normed=True, bottleneck=True):
         
-        # What to do with dummy seqs?
-#         if seq==None:
-#             return torch.tensor([0])
-
-#         print("ENTER:",seq.shape)
-                
         if len(seq.shape)==1:
             seq = seq.unsqueeze(0)
         
@@ -124,34 +99,24 @@ class SeqAutoencoder(nn.Module):
             out_mask = torch.zeros(self.n_tokens).to(seq.device)
         
         # Encode
-#         print("SEQ:",seq.shape)
         emb_seq = self.pos_enc( self.embedder(seq) )
-#         print(emb_seq.shape)
         enc_out = self.enc(src=emb_seq, mask=mask, src_key_padding_mask=pad_mask)
-#         print(enc_out.shape)
         # out -> (bs, 120, 512)
 
         # Situate the latent vector
         if bottleneck:
-#             print("BOTTLE")
             enc_sum = (avg_mask.unsqueeze(2)*enc_out).sum(axis = 1)
             enc_avg = enc_sum/(avg_mask.sum(axis = 1).unsqueeze(1))
-#             print(enc_avg.shape)
             # out -> (bs, 512)
             latent_vec = self.linear(enc_avg)
-#             print(latent_vec.shape)
             if normed:
-#                 print("hi")
-#                 print(latent_vec.shape)
-                latent_vec = F.normalize(latent_vec, dim=-1)           
-            
-            # out -> (bs, 32)            
-            latent_out = self.sample(latent_vec)
+#                 latent_vec = F.normalize(latent_vec, dim=-1)    
+                latent_vec = F.normalize(latent_vec, p=2.0, dim=-1)
+            latent_out = self.samp_linear(latent_vec)
             latent_out = latent_out.reshape(-1, self.max_len, self.dim_emb)
         else:
             latent_out = enc_out
-
-
+        # latent_out (bs, 31)
 
         # Decode
         dec_out = self.dec(tgt=emb_seq, memory=latent_out,
@@ -162,7 +127,8 @@ class SeqAutoencoder(nn.Module):
 
         return latent_vec, dec_out
             
-       
+
+
     
     
     

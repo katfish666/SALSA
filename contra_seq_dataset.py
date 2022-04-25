@@ -8,9 +8,12 @@ import numpy as np
 import pandas as pd
 import os
 import csv
+import sys
+sys.path.insert(0, '/home/kat/Repos/SALSA/')
 
 def get_dataset_array(anc_path, aug_path):
     ''' Returns pandas array of all molecules (ancs and augs). '''
+#     print (os.getcwd())
     anc_smi = pd.read_csv(anc_path)
     anc_smi['anc_idx'] = anc_smi.index
     anc_smi['atype'] = 'Anc'
@@ -102,12 +105,8 @@ class ContraSeqDataset(Dataset):
            
     def idc_tensor(self, smi):
         tensor = torch.zeros(len(smi)).long()
-#         print(smi)
         for i in range(len(smi)):
-#             try:
             tensor[i] = self.tokens.index(smi[i])
-#             except:
-#                 print(smi)
         return tensor
     
     def get_vec(self, smi):
