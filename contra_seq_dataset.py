@@ -11,22 +11,6 @@ import csv
 import sys
 sys.path.insert(0, '/home/kat/Repos/SALSA/')
 
-def get_dataset_array(anc_path, aug_path):
-    ''' Returns pandas array of all molecules (ancs and augs). '''
-#     print (os.getcwd())
-    anc_smi = pd.read_csv(anc_path)
-    anc_smi['anc_idx'] = anc_smi.index
-    anc_smi['atype'] = 'Anc'
-    anc_smi = anc_smi[['smiles','atype','anc_idx',]]
-    
-    aug_smi = pd.read_csv(aug_path)
-    aug_smi['atype'] = 'Aug'
-    aug_smi = aug_smi[['smiles','atype','anc_idx',]]
-    
-    tot_smi = pd.concat([anc_smi,aug_smi])
-
-    return tot_smi
-
 def get_anc_map(tot_smi):
     anc_idc = tot_smi['anc_idx'].unique()
     augs = np.asarray(tot_smi['anc_idx'].values)
@@ -36,54 +20,30 @@ def get_anc_map(tot_smi):
         anc_map[i] = aug_idc
     return anc_map
 
-
-from torch.utils.data import Sampler
-from typing import Iterator, List
-
-# Modeled off of ... 
-# https://pytorch.org/docs/stable/_modules/torch/utils/data/sampler.html#BatchSampler
-class AnchoredSampler(Sampler[List[int]]):
-    """
-    Args:
-        sampler (Sampler or Iterable): Base sampler. 
-        batch_size (int): Size of mini-batch.
-        drop_last (bool): If ``True``, the sampler will drop the last batch if
-            its size would be less than ``batch_size``
-    """
-
-    def __init__(self, sampler: Sampler[int], anc_map: dict,
-                 batch_size: int, drop_last: bool) -> None:
-        self.sampler = sampler
-        self.anc_map = anc_map
-        self.batch_size = batch_size
-        self.drop_last = drop_last
-
-    def __iter__(self) -> Iterator[List[int]]:
-        batch = []
-        i = 0
-        for idx in self.sampler:
-            augs = self.anc_map[idx].tolist()
-            batch.extend(augs)
-            i+=1
-            if i % (self.batch_size) == 0:
-                yield batch
-                batch = []               
-        if len(batch) > 0 and not self.drop_last:
-            yield batch
-
-    def __len__(self) -> int:
-        if self.drop_last:
-            return len(self.sampler) // self.batch_size  
-        else:
-            return (len(self.sampler) + self.batch_size - 1) // self.batch_size  
-        
+def get_dataset_array(anc_path, aug_path=None):
     
-        
-        
+    """ Returns pandas array of all molecules (ancs and augs). 
+        If no augmentations, only return anchors. """
+    
+    anc_smi = pd.read_csv(anc_path)
+    anc_smi['anc_idx'] = anc_smi.index
+    anc_smi['atype'] = 'Anc'
+    anc_smi = anc_smi[['smiles','atype','anc_idx',]]
+    
+    if aug_path:
+        aug_smi = pd.read_csv(aug_path)
+        aug_smi['atype'] = 'Aug'
+        aug_smi = aug_smi[['smiles','atype','anc_idx',]]
+        tot_smi = pd.concat([anc_smi,aug_smi])
+        return tot_smi
+   
+    else:
+        return anc_smi
+    
+
 class ContraSeqDataset(Dataset):
-    def __init__(self, anc_path, aug_path,
-                 start_token='<', end_token='>', pad_token = 'X', 
-                 max_len = 120, use_cuda=None):  
+    def __init__(self, anc_path, aug_path=None,
+                 s_token='<', e_token='>', pad_token = 'X', max_len = 120):  
         
         super().__init__() 
         
@@ -92,12 +52,12 @@ class ContraSeqDataset(Dataset):
         all_smi = np.transpose(self.df['smiles'].values)
 #         tokens,_ = tokenize( all_smi )  
         tokens = '#%()+-0123456789<=>BCFHILNOPRSX[]cnos'
-        tokens = list(set(tokens + start_token + end_token + pad_token))
+        tokens = list(set(tokens + s_token + e_token + pad_token))
         self.tokens = ''.join(list(np.sort(tokens)))  
         self.n_tokens = len(self.tokens)
                
-        self.s_token = start_token
-        self.e_token = end_token
+        self.s_token = s_token
+        self.e_token = e_token
         self.p_token = pad_token
 
         self.max_sm_len = max_len
@@ -166,8 +126,7 @@ class ContraSeqDataset(Dataset):
         smi, atype, label = self.df.iloc[idx].values
         
         # BrCl singled vec  
-        _smi = self.do_BrCl_singles(smi)
-        vec = self.get_vec(_smi)        
+        vec = self.get_vec( self.do_BrCl_singles(smi) )        
         # Masked vectors
         masks = self.masks(vec)
             
@@ -183,7 +142,45 @@ class ContraSeqDataset(Dataset):
         return seq_attr
     
     
+    
+from torch.utils.data import Sampler
+from typing import Iterator, List
+# Modeled off of ... 
+# https://pytorch.org/docs/stable/_modules/torch/utils/data/sampler.html#BatchSampler
+class AnchoredSampler(Sampler[List[int]]):
+    """
+    Args:
+        sampler (Sampler or Iterable): Base sampler. 
+        batch_size (int): Size of mini-batch.
+        drop_last (bool): If ``True``, the sampler will drop the last batch if
+            its size would be less than ``batch_size``
+    """
 
+    def __init__(self, sampler: Sampler[int], anc_map: dict,
+                 batch_size: int, drop_last: bool) -> None:
+        self.sampler = sampler
+        self.anc_map = anc_map
+        self.batch_size = batch_size
+        self.drop_last = drop_last
+
+    def __iter__(self) -> Iterator[List[int]]:
+        batch = []
+        i = 0
+        for idx in self.sampler:
+            augs = self.anc_map[idx].tolist()
+            batch.extend(augs)
+            i+=1
+            if i % (self.batch_size) == 0:
+                yield batch
+                batch = []               
+        if len(batch) > 0 and not self.drop_last:
+            yield batch
+
+    def __len__(self) -> int:
+        if self.drop_last:
+            return len(self.sampler) // self.batch_size  
+        else:
+            return (len(self.sampler) + self.batch_size - 1) // self.batch_size  
         
 
 

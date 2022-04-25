@@ -42,7 +42,7 @@ def normal_kl_divergence(mean, log_var):
 import torch
 import torch.nn as nn
 
-class SupConLoss(nn.Module): # temps were 0.07
+class SupConLoss(nn.Module): 
     def __init__(self, temp=0.07, contrast_mode='all', base_temp=0.07):
         super(SupConLoss, self).__init__()
         self.temperature = temp

@@ -21,3 +21,5 @@ Dataset
 
 - Longest SMILES in ChEMBL is...
     1489 characters
+    
+- SeqAE max_len must be two less than ContraSeqDataset max_len !!
