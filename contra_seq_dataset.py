@@ -142,7 +142,6 @@ class ContraSeqDataset(Dataset):
         return seq_attr
     
     
-    
 from torch.utils.data import Sampler
 from typing import Iterator, List
 # Modeled off of ... 
