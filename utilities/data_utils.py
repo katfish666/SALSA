@@ -56,6 +56,7 @@ def get_augs(smiles,atom_to_cnt,prop_filter=True,maximum=5):
             
     return (smiles, aug_smis)
 
+
 def get_anc_to_aug_map(df):
     PandasTools.AddMoleculeColumnToFrame(df,'smiles','mol',includeFingerprints=False)
     
@@ -68,8 +69,6 @@ def get_anc_to_aug_map(df):
     smiles_to_augs = {k:v for k,v in smiles_to_augs}
     
     return smiles_to_augs
-
-
 
 
 def get_atom_cnts(smileses):
@@ -89,6 +88,7 @@ def get_atom_cnts(smileses):
                 atom_to_cnt[atom_type] += 1
             
     return atom_to_cnt
+
 
 def get_weighted_random_atom(symb_to_count):
     '''
