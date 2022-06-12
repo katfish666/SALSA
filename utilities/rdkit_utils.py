@@ -1,11 +1,11 @@
 from rdkit import Chem
 from rdkit.Chem.rdchem import RWMol, Atom, BondType
 
-def get_cansmiles(smiles):
+def get_cansmiles(smiles, iso=False):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return ''
-    return Chem.MolToSmiles(mol, isomericSmiles=False)
+    return Chem.MolToSmiles(mol, isomericSmiles=iso)
 
 def count_atoms(smiles):
     '''
